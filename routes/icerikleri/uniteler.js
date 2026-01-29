@@ -60,7 +60,39 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 /**
- * GET /:slug - Belirli bir üniteyi getir
+ * GET /id/:id - Belirli bir üniteyi ID ile getir
+ * Erişim: Herkes (auth gerekli)
+ */
+router.get('/id/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { rows: uniteler } = await pool.query(`
+      SELECT * FROM uniteler WHERE id = $1 AND durum = 'aktif'
+    `, [id]);
+
+    if (uniteler.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ünite bulunamadı'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: uniteler[0]
+    });
+  } catch (error) {
+    console.error('Ünite getir hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ünite getirilirken hata oluştu'
+    });
+  }
+});
+
+/**
+ * GET /:slug - Belirli bir üniteyi slug ile getir
  * Erişim: Herkes (auth gerekli)
  */
 router.get('/:slug', authenticateToken, async (req, res) => {
