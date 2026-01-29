@@ -15,6 +15,8 @@
 1. `digibuch_db` (railway) veritabanına bağlan
 2. Query Tool'u aç
 3. `01-digibuch-schema.sql` dosyasını çalıştır
+4. `03-hallo-seed-data-FIXED.sql` dosyasını çalıştır (Hallo ünitesi + ilk 3 aktivite)
+5. `04-hallo-remaining-activities.sql` dosyasını çalıştır (Kalan 9 aktivite)
 
 **Oluşturulan tablolar:**
 - ✅ `uniteler` - Müfredat üniteleri (Hallo, ABC, etc.)

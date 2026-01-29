@@ -12,9 +12,30 @@ const router = express.Router();
 /**
  * GET / - Tüm üniteleri listele
  * Erişim: Herkes (auth gerekli)
+ * İzin kontrolü: Öğrenci sadece kendisine izin verilmiş üniteleri görür
  */
 router.get('/', authenticateToken, async (req, res) => {
   try {
+    // Admin/Öğretmen tüm üniteleri görebilir
+    if (req.user.rol === 'admin' || req.user.rol === 'ogretmen') {
+      const { rows: uniteler } = await pool.query(`
+        SELECT 
+          id, baslik, aciklama, slug, icon,
+          kapak_gorseli, sira_no, durum, toplam_puan
+        FROM uniteler
+        WHERE durum = 'aktif'
+        ORDER BY sira_no ASC
+      `);
+
+      return res.json({
+        success: true,
+        data: uniteler
+      });
+    }
+
+    // Öğrenci için izin kontrolü
+    // İzinler ayrı bir veritabanında (izinler_db)
+    // Geçici olarak tüm üniteleri döndür (izin sistemi sonra eklenecek)
     const { rows: uniteler } = await pool.query(`
       SELECT 
         id, baslik, aciklama, slug, icon,
@@ -26,7 +47,8 @@ router.get('/', authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      data: uniteler
+      data: uniteler,
+      message: 'İzin kontrolü henüz aktif değil - tüm üniteler gösteriliyor'
     });
   } catch (error) {
     console.error('Üniteler listele hatası:', error);
