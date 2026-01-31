@@ -157,9 +157,7 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
     if (soru_turu === 'video_dinleme' && (!video_url || !String(video_url).trim())) {
       return res.status(400).json({ success: false, message: 'Video Dinleme için video URL veya yolu gereklidir' });
     }
-    if (soru_turu === 'video_dinleme' && (!secenekler || secenekler.length === 0)) {
-      return res.status(400).json({ success: false, message: 'Seçenekler gereklidir' });
-    }
+    /* video_dinleme: seçenek yok, sadece videoyu izleyip sonraki soruya geçilir */
 
     const { rows: kitaplar } = await pool.query('SELECT id FROM kitaplar WHERE id = $1', [id]);
     if (kitaplar.length === 0) {
@@ -192,7 +190,8 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
     const soruId = soruRows[0].id;
 
     let dogruCevapId = null;
-    for (const secenek of secenekler) {
+    const secenekListesi = soru_turu === 'video_dinleme' ? (secenekler || []) : (secenekler || []);
+    for (const secenek of secenekListesi) {
       const secMetni = (secenek.secenek_metni && secenek.secenek_metni.trim()) ? secenek.secenek_metni.trim() : null;
       const secGorseli = (secenek.secenek_gorseli && secenek.secenek_gorseli.trim()) ? secenek.secenek_gorseli.trim() : null;
       const secSes = (secenek.secenek_ses_dosyasi && secenek.secenek_ses_dosyasi.trim()) ? secenek.secenek_ses_dosyasi.trim() : null;
@@ -282,7 +281,7 @@ router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admi
     if (kitaplar.length === 0) return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
 
     const guncelTur = soru_turu || (await pool.query('SELECT soru_turu FROM kitap_sorulari WHERE id = $1 AND kitap_id = $2', [soruId, id])).rows[0]?.soru_turu;
-    if (!secenekler || secenekler.length === 0) {
+    if (guncelTur !== 'video_dinleme' && (!secenekler || secenekler.length === 0)) {
       return res.status(400).json({ success: false, message: 'Seçenekler gereklidir' });
     }
     if (guncelTur === 'video_dinleme' && (video_url == null || String(video_url).trim() === '')) {
@@ -308,7 +307,8 @@ router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admi
     await pool.query('DELETE FROM kitap_soru_secenekleri WHERE soru_id = $1', [soruId]);
 
     let dogruCevapId = null;
-    for (const secenek of secenekler) {
+    const secenekListesiGuncelleme = guncelTur === 'video_dinleme' ? (secenekler || []) : (secenekler || []);
+    for (const secenek of secenekListesiGuncelleme) {
       const secMetni = (secenek.secenek_metni && secenek.secenek_metni.trim()) ? secenek.secenek_metni.trim() : null;
       const secGorseli = (secenek.secenek_gorseli && secenek.secenek_gorseli.trim()) ? secenek.secenek_gorseli.trim() : null;
       const secSes = (secenek.secenek_ses_dosyasi && secenek.secenek_ses_dosyasi.trim()) ? secenek.secenek_ses_dosyasi.trim() : null;
