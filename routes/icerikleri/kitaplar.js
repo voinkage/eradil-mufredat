@@ -10,7 +10,7 @@ import { authenticateToken, authorizeRoles } from '../../middleware/auth.js';
 const router = express.Router();
 const gecerliTurler = [
   'dinle_sec', 'renk_ses_eslestir', 'gruplama', 'swap_puzzle',
-  'puzzle_hatirla_yerlestir', 'klick_hor_gut_zu', 'bosluk_doldurma', 'eksik_harf_tamamlama', 'video_dinleme', 'diyalog'
+  'puzzle_hatirla_yerlestir', 'klick_hor_gut_zu', 'bosluk_doldurma', 'eksik_harf_tamamlama', 'video_dinleme', 'diyalog', 'dogru_ses_dogru_gorsel'
 ];
 
 /** GET / - Tüm kitapları listele (soru_sayisi ile). Öğrenci: sadece aktif kitaplar. */
@@ -151,7 +151,7 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
     if (!soru_turu || !gecerliTurler.includes(soru_turu)) {
       return res.status(400).json({ success: false, message: 'Geçerli soru türü gereklidir' });
     }
-    if (soru_turu !== 'video_dinleme' && soru_turu !== 'diyalog' && (!secenekler || secenekler.length === 0)) {
+    if (soru_turu !== 'video_dinleme' && soru_turu !== 'diyalog' && soru_turu !== 'dogru_ses_dogru_gorsel' && (!secenekler || secenekler.length === 0)) {
       return res.status(400).json({ success: false, message: 'Seçenekler gereklidir' });
     }
     if (soru_turu === 'video_dinleme' && (!video_url || !String(video_url).trim())) {
@@ -283,7 +283,7 @@ router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admi
     if (kitaplar.length === 0) return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
 
     const guncelTur = soru_turu || (await pool.query('SELECT soru_turu FROM kitap_sorulari WHERE id = $1 AND kitap_id = $2', [soruId, id])).rows[0]?.soru_turu;
-    if (guncelTur !== 'video_dinleme' && guncelTur !== 'diyalog' && (!secenekler || secenekler.length === 0)) {
+    if (guncelTur !== 'video_dinleme' && guncelTur !== 'diyalog' && guncelTur !== 'dogru_ses_dogru_gorsel' && (!secenekler || secenekler.length === 0)) {
       return res.status(400).json({ success: false, message: 'Seçenekler gereklidir' });
     }
     if (guncelTur === 'video_dinleme' && (video_url == null || String(video_url).trim() === '')) {
