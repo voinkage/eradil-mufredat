@@ -13,12 +13,15 @@ const gecerliTurler = [
   'puzzle_hatirla_yerlestir', 'klick_hor_gut_zu', 'bosluk_doldurma', 'eksik_harf_tamamlama'
 ];
 
-/** GET / - Tüm kitapları listele (soru_sayisi ile) */
-router.get('/', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
+/** GET / - Tüm kitapları listele (soru_sayisi ile). Öğrenci: sadece aktif kitaplar. */
+router.get('/', authenticateToken, authorizeRoles('admin', 'ogretmen', 'ogrenci'), async (req, res) => {
   try {
+    const userRol = req.user.rol || req.user.role;
+    const isOgrenci = userRol === 'ogrenci';
+    const whereClause = isOgrenci ? ' WHERE k.durum = \'aktif\'' : '';
     const { rows } = await pool.query(`
       SELECT k.*, (SELECT COUNT(*)::int FROM kitap_sorulari WHERE kitap_id = k.id) AS soru_sayisi
-      FROM kitaplar k
+      FROM kitaplar k${whereClause}
       ORDER BY k.id DESC
     `);
     return res.json({ success: true, data: rows });
