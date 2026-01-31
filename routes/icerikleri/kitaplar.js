@@ -10,7 +10,7 @@ import { authenticateToken, authorizeRoles } from '../../middleware/auth.js';
 const router = express.Router();
 const gecerliTurler = [
   'dinle_sec', 'renk_ses_eslestir', 'gruplama', 'swap_puzzle',
-  'puzzle_hatirla_yerlestir', 'klick_hor_gut_zu', 'bosluk_doldurma', 'eksik_harf_tamamlama'
+  'puzzle_hatirla_yerlestir', 'klick_hor_gut_zu', 'bosluk_doldurma', 'eksik_harf_tamamlama', 'video_dinleme'
 ];
 
 /** GET / - Tüm kitapları listele (soru_sayisi ile). Öğrenci: sadece aktif kitaplar. */
@@ -146,12 +146,18 @@ router.delete('/:id', authenticateToken, authorizeRoles('admin', 'ogretmen'), as
 router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { soru_numarasi, soru_turu, soru_metni, soru_puan, ses_dosyasi, ek_bilgi, yonerge, secenekler, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli } = req.body;
+    const { soru_numarasi, soru_turu, soru_metni, soru_puan, ses_dosyasi, video_url, ek_bilgi, yonerge, secenekler, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli } = req.body;
 
     if (!soru_turu || !gecerliTurler.includes(soru_turu)) {
       return res.status(400).json({ success: false, message: 'Geçerli soru türü gereklidir' });
     }
-    if (!secenekler || secenekler.length === 0) {
+    if (soru_turu !== 'video_dinleme' && (!secenekler || secenekler.length === 0)) {
+      return res.status(400).json({ success: false, message: 'Seçenekler gereklidir' });
+    }
+    if (soru_turu === 'video_dinleme' && (!video_url || !String(video_url).trim())) {
+      return res.status(400).json({ success: false, message: 'Video Dinleme için video URL veya yolu gereklidir' });
+    }
+    if (soru_turu === 'video_dinleme' && (!secenekler || secenekler.length === 0)) {
       return res.status(400).json({ success: false, message: 'Seçenekler gereklidir' });
     }
 
@@ -174,11 +180,12 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
     const arkaYatay = (arka_plan_gorsel_yatay && String(arka_plan_gorsel_yatay).trim()) ? String(arka_plan_gorsel_yatay).trim() : null;
     const arkaDikey = (arka_plan_gorsel_dikey && String(arka_plan_gorsel_dikey).trim()) ? String(arka_plan_gorsel_dikey).trim() : null;
     const secArka = (secenek_arka_plan_gorseli && String(secenek_arka_plan_gorseli).trim()) ? String(secenek_arka_plan_gorseli).trim() : null;
+    const videoUrlVal = (video_url != null && String(video_url).trim() !== '') ? String(video_url).trim() : null;
 
     const { rows: soruRows } = await pool.query(
-      `INSERT INTO kitap_sorulari (kitap_id, soru_numarasi, soru_turu, soru_metni, soru_puan, ses_dosyasi, dogru_cevap_id, ek_bilgi, yonerge, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
-      [id, finalSira, soru_turu, soruMetniVal, soru_puan || null, ses_dosyasi || null, null, ek_bilgi || null, yonergeVal, arkaYatay, arkaDikey, secArka]
+      `INSERT INTO kitap_sorulari (kitap_id, soru_numarasi, soru_turu, soru_metni, soru_puan, ses_dosyasi, dogru_cevap_id, ek_bilgi, yonerge, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, video_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+      [id, finalSira, soru_turu, soruMetniVal, soru_puan || null, ses_dosyasi || null, null, ek_bilgi || null, yonergeVal, arkaYatay, arkaDikey, secArka, videoUrlVal]
     );
     const soruId = soruRows[0].id;
 
@@ -267,7 +274,7 @@ router.put('/:id/sorular/siralama', authenticateToken, authorizeRoles('admin', '
 router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
   try {
     const { id, soruId } = req.params;
-    const { soru_numarasi, soru_turu, soru_metni, soru_puan, ses_dosyasi, ek_bilgi, yonerge, secenekler, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli } = req.body;
+    const { soru_numarasi, soru_turu, soru_metni, soru_puan, ses_dosyasi, video_url, ek_bilgi, yonerge, secenekler, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli } = req.body;
 
     const { rows: kitaplar } = await pool.query('SELECT id FROM kitaplar WHERE id = $1', [id]);
     if (kitaplar.length === 0) return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
@@ -276,18 +283,22 @@ router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admi
     if (!secenekler || secenekler.length === 0) {
       return res.status(400).json({ success: false, message: 'Seçenekler gereklidir' });
     }
+    if (guncelTur === 'video_dinleme' && (video_url == null || String(video_url).trim() === '')) {
+      return res.status(400).json({ success: false, message: 'Video Dinleme için video URL veya yolu gereklidir' });
+    }
 
     const soruMetniVal = (soru_metni != null && String(soru_metni).trim() !== '') ? String(soru_metni).trim() : null;
     const yonergeVal = (yonerge != null && String(yonerge).trim() !== '') ? String(yonerge).trim() : null;
     const arkaYatay = (arka_plan_gorsel_yatay != null && String(arka_plan_gorsel_yatay).trim() !== '') ? String(arka_plan_gorsel_yatay).trim() : null;
     const arkaDikey = (arka_plan_gorsel_dikey != null && String(arka_plan_gorsel_dikey).trim() !== '') ? String(arka_plan_gorsel_dikey).trim() : null;
     const secArka = (secenek_arka_plan_gorseli != null && String(secenek_arka_plan_gorseli).trim() !== '') ? String(secenek_arka_plan_gorseli).trim() : null;
+    const videoUrlVal = (video_url != null && String(video_url).trim() !== '') ? String(video_url).trim() : null;
 
     await pool.query(
-      `UPDATE kitap_sorulari SET soru_turu = $1, soru_puan = $2, ses_dosyasi = $3, soru_metni = $4, dogru_cevap_id = NULL, ek_bilgi = $5, yonerge = $6, arka_plan_gorsel_yatay = $7, arka_plan_gorsel_dikey = $8, secenek_arka_plan_gorseli = $9${soru_numarasi != null ? ', soru_numarasi = $10' : ''} WHERE id = ${soru_numarasi != null ? '$11' : '$10'}`,
+      `UPDATE kitap_sorulari SET soru_turu = $1, soru_puan = $2, ses_dosyasi = $3, soru_metni = $4, dogru_cevap_id = NULL, ek_bilgi = $5, yonerge = $6, arka_plan_gorsel_yatay = $7, arka_plan_gorsel_dikey = $8, secenek_arka_plan_gorseli = $9, video_url = $10${soru_numarasi != null ? ', soru_numarasi = $11' : ''} WHERE id = ${soru_numarasi != null ? '$12' : '$11'}`,
       soru_numarasi != null
-        ? [guncelTur, soru_puan || null, ses_dosyasi || null, soruMetniVal, ek_bilgi || null, yonergeVal, arkaYatay, arkaDikey, secArka, soru_numarasi, soruId]
-        : [guncelTur, soru_puan || null, ses_dosyasi || null, soruMetniVal, ek_bilgi || null, yonergeVal, arkaYatay, arkaDikey, secArka, soruId]
+        ? [guncelTur, soru_puan || null, ses_dosyasi || null, soruMetniVal, ek_bilgi || null, yonergeVal, arkaYatay, arkaDikey, secArka, videoUrlVal, soru_numarasi, soruId]
+        : [guncelTur, soru_puan || null, ses_dosyasi || null, soruMetniVal, ek_bilgi || null, yonergeVal, arkaYatay, arkaDikey, secArka, videoUrlVal, soruId]
     );
 
     await pool.query('DELETE FROM kitap_soru_secenekleri WHERE soru_id = $1', [soruId]);
