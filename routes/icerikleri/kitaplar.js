@@ -174,7 +174,8 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
       return res.status(400).json({ success: false, message: 'Geçerli soru türü gereklidir' });
     }
     const isAsamali = asamali === true || asamali === 'true' || asamali === 1 || asamali === '1';
-    if (soru_turu !== 'video_dinleme' && soru_turu !== 'diyalog' && soru_turu !== 'dogru_ses_dogru_gorsel' && soru_turu !== 'gorsel_ver_yazi_iste' && (!secenekler || secenekler.length === 0)) {
+    const asamaliDolu = isAsamali && asamalar && Array.isArray(asamalar) && asamalar.length > 0;
+    if (soru_turu !== 'video_dinleme' && soru_turu !== 'diyalog' && soru_turu !== 'dogru_ses_dogru_gorsel' && soru_turu !== 'gorsel_ver_yazi_iste' && !asamaliDolu && (!secenekler || secenekler.length === 0)) {
       return res.status(400).json({ success: false, message: 'Seçenekler gereklidir' });
     }
     if (soru_turu === 'video_dinleme' && !isAsamali && (!video_url || !String(video_url).trim())) {
@@ -325,7 +326,8 @@ router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admi
 
     const guncelTur = soru_turu || (await pool.query('SELECT soru_turu FROM kitap_sorulari WHERE id = $1 AND kitap_id = $2', [soruId, id])).rows[0]?.soru_turu;
     const isAsamali = asamali === true || asamali === 'true' || asamali === 1 || asamali === '1';
-    if (guncelTur !== 'video_dinleme' && guncelTur !== 'diyalog' && guncelTur !== 'dogru_ses_dogru_gorsel' && guncelTur !== 'gorsel_ver_yazi_iste' && (!secenekler || secenekler.length === 0)) {
+    const asamaliDolu = isAsamali && asamalar && Array.isArray(asamalar) && asamalar.length > 0;
+    if (guncelTur !== 'video_dinleme' && guncelTur !== 'diyalog' && guncelTur !== 'dogru_ses_dogru_gorsel' && guncelTur !== 'gorsel_ver_yazi_iste' && !asamaliDolu && (!secenekler || secenekler.length === 0)) {
       return res.status(400).json({ success: false, message: 'Seçenekler gereklidir' });
     }
     if (guncelTur === 'video_dinleme' && !isAsamali && (video_url == null || String(video_url).trim() === '')) {
