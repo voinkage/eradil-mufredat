@@ -193,6 +193,15 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
     if (soru_turu === 'dinle_sec' && !asamaliDolu && (!ses_dosyasi || !String(ses_dosyasi).trim())) {
       return res.status(400).json({ success: false, message: 'Dinle ve Seç için soru sesi (zorunlu) gereklidir' });
     }
+    if (soru_turu === 'dinle_sec' && !asamaliDolu && (!soru_gorseli || !String(soru_gorseli).trim())) {
+      return res.status(400).json({ success: false, message: 'Dinle ve Seç için ses çalma görseli (zorunlu) gereklidir' });
+    }
+    if (soru_turu === 'dinle_sec' && asamaliDolu && asamalar.some(a => {
+      const icerik = (a.icerik && typeof a.icerik === 'object') ? a.icerik : {};
+      return !icerik.soru_gorseli || !String(icerik.soru_gorseli).trim();
+    })) {
+      return res.status(400).json({ success: false, message: 'Dinle ve Seç aşamalarında ses çalma görseli (zorunlu) gereklidir' });
+    }
 
     const { rows: kitaplar } = await pool.query('SELECT id FROM kitaplar WHERE id = $1', [id]);
     if (kitaplar.length === 0) {
@@ -349,6 +358,15 @@ router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admi
     const guncelAsamaliDolu = isAsamali && asamalar && Array.isArray(asamalar) && asamalar.length > 0;
     if (guncelTur === 'dinle_sec' && !guncelAsamaliDolu && (!ses_dosyasi || !String(ses_dosyasi).trim())) {
       return res.status(400).json({ success: false, message: 'Dinle ve Seç için soru sesi (zorunlu) gereklidir' });
+    }
+    if (guncelTur === 'dinle_sec' && !guncelAsamaliDolu && (!soru_gorseli || !String(soru_gorseli).trim())) {
+      return res.status(400).json({ success: false, message: 'Dinle ve Seç için ses çalma görseli (zorunlu) gereklidir' });
+    }
+    if (guncelTur === 'dinle_sec' && guncelAsamaliDolu && asamalar.some(a => {
+      const icerik = (a.icerik && typeof a.icerik === 'object') ? a.icerik : {};
+      return !icerik.soru_gorseli || !String(icerik.soru_gorseli).trim();
+    })) {
+      return res.status(400).json({ success: false, message: 'Dinle ve Seç aşamalarında ses çalma görseli (zorunlu) gereklidir' });
     }
 
     const soruAdiVal = (soru_adi != null && String(soru_adi).trim() !== '') ? String(soru_adi).trim() : null;
