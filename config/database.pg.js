@@ -1,6 +1,6 @@
 /**
  * POSTGRESQL DATABASE CONFIGURATION
- * İki ayrı database: digibuch_db (içerikler) ve izinler_db (erişim kontrol)
+ * Müfredat içerikleri (kitaplar) – tüm içerikler herkese açık, izin/atama yok
  */
 
 import pg from 'pg';
@@ -35,7 +35,7 @@ function parseConnectionUrl(urlString) {
   }
 }
 
-// ===== DİGİBUCH DATABASE (Müfredat İçerikleri) =====
+// ===== MÜFREDAT İÇERİK DATABASE (kitaplar, uniteler) =====
 let digibuchConfig;
 
 if (process.env.DIGIBUCH_DB_URL) {
@@ -57,52 +57,20 @@ export const digibuchPool = digibuchConfig ? new Pool(digibuchConfig) : null;
 if (digibuchPool) {
   digibuchPool.query('SELECT NOW()', (err, res) => {
     if (err) {
-      console.error('❌ DIGIBUCH_DB bağlantı hatası:', err.message);
+      console.error('❌ Müfredat DB bağlantı hatası:', err.message);
     } else {
-      console.log('✅ DIGIBUCH_DB veritabanına başarıyla bağlandı: railway');
+      console.log('✅ Müfredat DB veritabanına başarıyla bağlandı');
     }
   });
 } else {
-  console.warn('⚠️ DIGIBUCH_DB yapılandırması eksik!');
-}
-
-// ===== İZİNLER DATABASE (Okul/Öğretmen/Sınıf İzinleri) =====
-let izinlerConfig;
-
-if (process.env.IZINLER_DB_URL) {
-  izinlerConfig = parseConnectionUrl(process.env.IZINLER_DB_URL);
-} else {
-  izinlerConfig = {
-    host: process.env.IZINLER_DB_HOST || 'localhost',
-    port: parseInt(process.env.IZINLER_DB_PORT) || 5432,
-    user: process.env.IZINLER_DB_USER || 'postgres',
-    password: process.env.IZINLER_DB_PASSWORD,
-    database: process.env.IZINLER_DB_NAME || 'izinler_db',
-    ssl: process.env.IZINLER_DB_SSL === 'true' ? { rejectUnauthorized: false } : false
-  };
-}
-
-export const izinlerPool = izinlerConfig ? new Pool(izinlerConfig) : null;
-
-// Connection test
-if (izinlerPool) {
-  izinlerPool.query('SELECT NOW()', (err, res) => {
-    if (err) {
-      console.error('❌ IZINLER_DB bağlantı hatası:', err.message);
-    } else {
-      console.log('✅ IZINLER_DB veritabanına başarıyla bağlandı: railway');
-    }
-  });
-} else {
-  console.warn('⚠️ IZINLER_DB yapılandırması eksik!');
+  console.warn('⚠️ Müfredat DB (DIGIBUCH_DB_URL) yapılandırması eksik!');
 }
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('🔄 Database bağlantıları kapatılıyor...');
   if (digibuchPool) await digibuchPool.end();
-  if (izinlerPool) await izinlerPool.end();
   process.exit(0);
 });
 
-export default { digibuchPool, izinlerPool };
+export default { digibuchPool };

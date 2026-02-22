@@ -1,6 +1,6 @@
 /**
- * ERADIL MÜFREDAT (DIGIBUCH) BACKEND
- * Dijital müfredat sistemi - İlerlemeli öğrenme platformu
+ * ERADIL MÜFREDAT BACKEND
+ * Dijital müfredat sistemi - Kitaplar (tüm içerikler herkese açık)
  */
 
 import express from 'express';
@@ -8,7 +8,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
-import { digibuchPool, izinlerPool } from './config/database.pg.js';
+import { digibuchPool } from './config/database.pg.js';
 
 dotenv.config();
 
@@ -51,18 +51,15 @@ app.get('/health', (req, res) => {
     message: 'ERADIL Müfredat Backend çalışıyor',
     timestamp: new Date().toISOString(),
     databases: {
-      digibuch: digibuchPool ? 'connected' : 'not configured',
-      izinler: izinlerPool ? 'connected' : 'not configured'
+      mufredat: digibuchPool ? 'connected' : 'not configured'
     }
   });
 });
 
 // ===== API ROUTES =====
 import mufredatIcerikleri from './routes/icerikleri/index.js';
-import mufredatIzinleri from './routes/mufredat-izinleri.js';
 
 app.use('/api/mufredat/icerikleri', mufredatIcerikleri);
-app.use('/api/mufredat/izinleri', mufredatIzinleri);
 
 // ===== 404 HANDLER =====
 app.use((req, res) => {
@@ -87,20 +84,18 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log('');
   console.log('═══════════════════════════════════════════════════════════');
-  console.log('🎓 ERADIL MÜFREDAT (DIGIBUCH) BACKEND');
+  console.log('🎓 ERADIL MÜFREDAT BACKEND');
   console.log('═══════════════════════════════════════════════════════════');
   console.log(`🚀 Server çalışıyor: http://localhost:${PORT}`);
   console.log(`📦 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔐 JWT Secret: ${process.env.JWT_SECRET ? '✅ Configured' : '❌ Missing'}`);
   console.log('');
   console.log('📊 Database Durumu:');
-  console.log(`   • Digibuch DB: ${digibuchPool ? '✅ Connected' : '❌ Not configured'}`);
-  console.log(`   • İzinler DB: ${izinlerPool ? '✅ Connected' : '❌ Not configured'}`);
+  console.log(`   • Müfredat DB: ${digibuchPool ? '✅ Connected' : '❌ Not configured'}`);
   console.log('');
   console.log('📡 API Endpoints:');
   console.log('   • GET  /health - Health check');
-  console.log('   • /api/mufredat/icerikleri/* - İçerik yönetimi (uniteler, aktiviteler)');
-  console.log('   • /api/mufredat/izinleri/* - İzin yönetimi (SADECE ADMİN)');
+  console.log('   • /api/mufredat/icerikleri/* - Kitaplar (içerikler herkese açık)');
   console.log('═══════════════════════════════════════════════════════════');
   console.log('');
 });

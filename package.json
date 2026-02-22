@@ -1,7 +1,7 @@
 {
   "name": "eradil-mufredat",
   "version": "1.0.0",
-  "description": "ERAX Digibuch - Dijital Müfredat Sistemi",
+  "description": "ERAX Müfredat - Dijital Müfredat Sistemi (kitaplar, uniteler)",
   "main": "server.js",
   "type": "module",
   "scripts": {
