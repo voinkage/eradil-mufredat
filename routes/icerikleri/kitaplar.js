@@ -34,15 +34,16 @@ router.get('/', authenticateToken, authorizeRoles('admin', 'ogretmen', 'ogrenci'
 /** POST / - Yeni kitap oluştur */
 router.post('/', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
   try {
-    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, gorsel_yolu } = req.body;
+    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
     const userRol = req.user.rol || req.user.role;
     if (!ad) {
       return res.status(400).json({ success: false, message: 'Kitap adı gereklidir' });
     }
+    const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
     const { rows } = await pool.query(
-      `INSERT INTO kitaplar (ad, aciklama, kategori, sinif_seviyesi, olusturan_id, olusturan_rol, durum, tur, toplam_puan, gorsel_yolu)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-      [ad, aciklama || null, kategori || null, sinif_seviyesi || null, req.user.id, userRol, durum || 'aktif', null, toplam_puan || null, gorsel_yolu || null]
+      `INSERT INTO kitaplar (ad, aciklama, kategori, sinif_seviyesi, olusturan_id, olusturan_rol, durum, tur, toplam_puan, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
+      [ad, aciklama || null, kategori || null, sinif_seviyesi || null, req.user.id, userRol, durum || 'aktif', null, toplam_puan || null, gorsel_yolu || null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel)]
     );
     return res.status(201).json({ success: true, message: 'Kitap oluşturuldu', data: { id: rows[0].id } });
   } catch (error) {
@@ -130,16 +131,17 @@ router.get('/:id', authenticateToken, async (req, res) => {
 router.put('/:id', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, gorsel_yolu } = req.body;
+    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
 
     const { rows } = await pool.query('SELECT id FROM kitaplar WHERE id = $1', [id]);
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
     }
 
+    const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
     await pool.query(
-      `UPDATE kitaplar SET ad = $1, aciklama = $2, kategori = $3, sinif_seviyesi = $4, durum = $5, toplam_puan = $6, gorsel_yolu = $7 WHERE id = $8`,
-      [ad, aciklama || null, kategori || null, sinif_seviyesi || null, durum, toplam_puan || null, gorsel_yolu ?? null, id]
+      `UPDATE kitaplar SET ad = $1, aciklama = $2, kategori = $3, sinif_seviyesi = $4, durum = $5, toplam_puan = $6, gorsel_yolu = $7, ses_ikonu_gorsel = $8, ilerleme_butonu_gorsel = $9, geri_butonu_gorsel = $10, tam_ekran_butonu_gorsel = $11, kucuk_ekran_butonu_gorsel = $12, dogru_tik_gorsel = $13 WHERE id = $14`,
+      [ad, aciklama || null, kategori || null, sinif_seviyesi || null, durum, toplam_puan || null, gorsel_yolu ?? null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel), id]
     );
     return res.json({ success: true, message: 'Kitap güncellendi' });
   } catch (error) {
@@ -168,7 +170,7 @@ router.delete('/:id', authenticateToken, authorizeRoles('admin', 'ogretmen'), as
 router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, video_url, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenekler, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, soru_gorseli, asamali, asamalar, ses_ikonu_gorsel, ilerleme_butonu_gorsel, tam_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
+    const { soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, video_url, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenekler, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, soru_gorseli, asamali, asamalar } = req.body;
 
     if (!soru_turu || !gecerliTurler.includes(soru_turu)) {
       return res.status(400).json({ success: false, message: 'Geçerli soru türü gereklidir' });
@@ -227,15 +229,10 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
     const videoUrlVal = (video_url != null && String(video_url).trim() !== '') ? String(video_url).trim() : null;
     const soruGorseliVal = (soru_gorseli != null && String(soru_gorseli).trim() !== '') ? String(soru_gorseli).trim() : null;
     const asamaliVal = !!isAsamali;
-    const sesIkonuVal = (ses_ikonu_gorsel != null && String(ses_ikonu_gorsel).trim() !== '') ? String(ses_ikonu_gorsel).trim() : null;
-    const ilerlemeVal = (ilerleme_butonu_gorsel != null && String(ilerleme_butonu_gorsel).trim() !== '') ? String(ilerleme_butonu_gorsel).trim() : null;
-    const tamEkranVal = (tam_ekran_butonu_gorsel != null && String(tam_ekran_butonu_gorsel).trim() !== '') ? String(tam_ekran_butonu_gorsel).trim() : null;
-    const dogruTikVal = (dogru_tik_gorsel != null && String(dogru_tik_gorsel).trim() !== '') ? String(dogru_tik_gorsel).trim() : null;
-
     const { rows: soruRows } = await pool.query(
-      `INSERT INTO kitap_sorulari (kitap_id, soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, dogru_cevap_id, ek_bilgi, yonerge, yonerge_ses_dosyasi, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, video_url, soru_gorseli, asamali, ses_ikonu_gorsel, ilerleme_butonu_gorsel, tam_ekran_butonu_gorsel, dogru_tik_gorsel)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) RETURNING id`,
-      [id, finalSira, soru_turu, soruAdiVal, soruMetniVal, soru_puan || null, ses_dosyasi || null, null, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaYatay, arkaDikey, secArka, videoUrlVal, soruGorseliVal, asamaliVal, sesIkonuVal, ilerlemeVal, tamEkranVal, dogruTikVal]
+      `INSERT INTO kitap_sorulari (kitap_id, soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, dogru_cevap_id, ek_bilgi, yonerge, yonerge_ses_dosyasi, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, video_url, soru_gorseli, asamali)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
+      [id, finalSira, soru_turu, soruAdiVal, soruMetniVal, soru_puan || null, ses_dosyasi || null, null, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaYatay, arkaDikey, secArka, videoUrlVal, soruGorseliVal, asamaliVal]
     );
     const soruId = soruRows[0].id;
 
@@ -336,7 +333,7 @@ router.put('/:id/sorular/siralama', authenticateToken, authorizeRoles('admin', '
 router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
   try {
     const { id, soruId } = req.params;
-    const { soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, video_url, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenekler, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, soru_gorseli, asamali, asamalar, ses_ikonu_gorsel, ilerleme_butonu_gorsel, tam_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
+    const { soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, video_url, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenekler, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, soru_gorseli, asamali, asamalar } = req.body;
 
     const { rows: kitaplar } = await pool.query('SELECT id FROM kitaplar WHERE id = $1', [id]);
     if (kitaplar.length === 0) return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
@@ -383,16 +380,11 @@ router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admi
     const videoUrlVal = (video_url != null && String(video_url).trim() !== '') ? String(video_url).trim() : null;
     const soruGorseliVal = (soru_gorseli != null && String(soru_gorseli).trim() !== '') ? String(soru_gorseli).trim() : null;
     const asamaliVal = !!isAsamali;
-    const sesIkonuVal = (ses_ikonu_gorsel != null && String(ses_ikonu_gorsel).trim() !== '') ? String(ses_ikonu_gorsel).trim() : null;
-    const ilerlemeVal = (ilerleme_butonu_gorsel != null && String(ilerleme_butonu_gorsel).trim() !== '') ? String(ilerleme_butonu_gorsel).trim() : null;
-    const tamEkranVal = (tam_ekran_butonu_gorsel != null && String(tam_ekran_butonu_gorsel).trim() !== '') ? String(tam_ekran_butonu_gorsel).trim() : null;
-    const dogruTikVal = (dogru_tik_gorsel != null && String(dogru_tik_gorsel).trim() !== '') ? String(dogru_tik_gorsel).trim() : null;
-
     await pool.query(
-      `UPDATE kitap_sorulari SET soru_turu = $1, soru_puan = $2, ses_dosyasi = $3, soru_adi = $4, soru_metni = $5, dogru_cevap_id = NULL, ek_bilgi = $6, yonerge = $7, yonerge_ses_dosyasi = $8, arka_plan_gorsel_yatay = $9, arka_plan_gorsel_dikey = $10, secenek_arka_plan_gorseli = $11, video_url = $12, soru_gorseli = $13, asamali = $14, ses_ikonu_gorsel = $15, ilerleme_butonu_gorsel = $16, tam_ekran_butonu_gorsel = $17, dogru_tik_gorsel = $18${soru_numarasi != null ? ', soru_numarasi = $19' : ''} WHERE id = ${soru_numarasi != null ? '$20' : '$19'}`,
+      `UPDATE kitap_sorulari SET soru_turu = $1, soru_puan = $2, ses_dosyasi = $3, soru_adi = $4, soru_metni = $5, dogru_cevap_id = NULL, ek_bilgi = $6, yonerge = $7, yonerge_ses_dosyasi = $8, arka_plan_gorsel_yatay = $9, arka_plan_gorsel_dikey = $10, secenek_arka_plan_gorseli = $11, video_url = $12, soru_gorseli = $13, asamali = $14${soru_numarasi != null ? ', soru_numarasi = $15' : ''} WHERE id = ${soru_numarasi != null ? '$16' : '$15'}`,
       soru_numarasi != null
-        ? [guncelTur, soru_puan || null, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaYatay, arkaDikey, secArka, videoUrlVal, soruGorseliVal, asamaliVal, sesIkonuVal, ilerlemeVal, tamEkranVal, dogruTikVal, soru_numarasi, soruId]
-        : [guncelTur, soru_puan || null, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaYatay, arkaDikey, secArka, videoUrlVal, soruGorseliVal, asamaliVal, sesIkonuVal, ilerlemeVal, tamEkranVal, dogruTikVal, soruId]
+        ? [guncelTur, soru_puan || null, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaYatay, arkaDikey, secArka, videoUrlVal, soruGorseliVal, asamaliVal, soru_numarasi, soruId]
+        : [guncelTur, soru_puan || null, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaYatay, arkaDikey, secArka, videoUrlVal, soruGorseliVal, asamaliVal, soruId]
     );
 
     await pool.query('DELETE FROM kitap_soru_asamalari WHERE soru_id = $1', [soruId]).catch(() => {});
