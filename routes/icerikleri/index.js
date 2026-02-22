@@ -1,13 +1,13 @@
 /**
  * İÇERİKLERİ ROUTES - ANA ROUTER
- * Kitaplar (ünite sihirbazı) – uniteler/aktiviteler/ilerleme Digibuch kaldırıldı
+ * Kitaplar (Ünite Sihirbazı) → erax-admin'e taşındı.
+ * Bu router boş bırakıldı; uniteler/aktiviteler/ilerleme zaten kaldırılmıştı.
  */
 
 import express from 'express';
-import kitaplarRouter from './kitaplar.js';
 
 const router = express.Router();
 
-router.use('/kitaplar', kitaplarRouter);
+// Kitaplar artık erax-admin'de: /api/mufredat/icerikleri/kitaplar
 
 export default router;
