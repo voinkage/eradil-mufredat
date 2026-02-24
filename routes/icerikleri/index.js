@@ -1,13 +1,13 @@
 /**
  * İÇERİKLERİ ROUTES - ANA ROUTER
- * Kitaplar (Ünite Sihirbazı) → erax-admin'e taşındı.
- * Bu router boş bırakıldı; uniteler/aktiviteler/ilerleme zaten kaldırılmıştı.
+ * Kitaplar: öğrenci/öğretmen listesi + detay (çözüm). Admin CRUD erax-admin'de.
  */
 
 import express from 'express';
+import kitaplarRouter from './kitaplar.js';
 
 const router = express.Router();
 
-// Kitaplar artık erax-admin'de: /api/mufredat/icerikleri/kitaplar
+router.use('/kitaplar', kitaplarRouter);
 
 export default router;

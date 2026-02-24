@@ -1,24 +1,19 @@
 /**
- * KİTAPLAR ROUTE (Ünite Sihirbazı)
- * Müfredat/uniteler (Hallo vb.) ile karışmaz; yeni tablolar: kitaplar, kitap_sorulari, kitap_soru_secenekleri
+ * ERADIL-MÜFREDAT – Öğrenci/öğretmen için kitap listesi ve detay (çözüm ekranı)
+ * Admin listesi ve CRUD erax-admin'de (/api/mufredat/icerikleri/kitaplar).
  */
-
 import express from 'express';
 import { digibuchPool as pool } from '../../config/database.pg.js';
 import { authenticateToken, authorizeRoles } from '../../middleware/auth.js';
 
 const router = express.Router();
-const gecerliTurler = [
-  'dinle_sec', 'renk_ses_eslestir', 'gruplama', 'swap_puzzle',
-  'puzzle_hatirla_yerlestir', 'klick_hor_gut_zu', 'bosluk_doldurma', 'eksik_harf_tamamlama', 'video_dinleme', 'diyalog', 'dogru_ses_dogru_gorsel', 'gorsel_ver_yazi_iste'
-];
 
-/** GET / - Tüm kitapları listele (soru_sayisi ile). Öğrenci: sadece aktif kitaplar. */
-router.get('/', authenticateToken, authorizeRoles('admin', 'ogretmen', 'ogrenci'), async (req, res) => {
+/** GET / - Öğrenci/öğretmen: kitap listesi. Öğrenci için sadece aktif. */
+router.get('/', authenticateToken, authorizeRoles('ogrenci', 'ogretmen'), async (req, res) => {
   try {
     const userRol = req.user.rol || req.user.role;
     const isOgrenci = userRol === 'ogrenci';
-    const whereClause = isOgrenci ? ' WHERE k.durum = \'aktif\'' : '';
+    const whereClause = isOgrenci ? " WHERE k.durum = 'aktif'" : '';
     const { rows } = await pool.query(`
       SELECT k.*, (SELECT COUNT(*)::int FROM kitap_sorulari WHERE kitap_id = k.id) AS soru_sayisi
       FROM kitaplar k${whereClause}
@@ -31,29 +26,8 @@ router.get('/', authenticateToken, authorizeRoles('admin', 'ogretmen', 'ogrenci'
   }
 });
 
-/** POST / - Yeni kitap oluştur */
-router.post('/', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
-  try {
-    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
-    const userRol = req.user.rol || req.user.role;
-    if (!ad) {
-      return res.status(400).json({ success: false, message: 'Kitap adı gereklidir' });
-    }
-    const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
-    const { rows } = await pool.query(
-      `INSERT INTO kitaplar (ad, aciklama, kategori, sinif_seviyesi, olusturan_id, olusturan_rol, durum, tur, toplam_puan, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
-      [ad, aciklama || null, kategori || null, sinif_seviyesi || null, req.user.id, userRol, durum || 'aktif', null, toplam_puan || null, gorsel_yolu || null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel)]
-    );
-    return res.status(201).json({ success: true, message: 'Kitap oluşturuldu', data: { id: rows[0].id } });
-  } catch (error) {
-    console.error('Kitap oluşturma hatası:', error);
-    return res.status(500).json({ success: false, message: 'Kitap oluşturulurken hata oluştu' });
-  }
-});
-
-/** GET /:id - Kitap detayı + sorular (etkinlik detay ile aynı yapı) */
-router.get('/:id', authenticateToken, async (req, res) => {
+/** GET /:id - Öğrenci/öğretmen: kitap detayı + sorular (çözüm ekranı) */
+router.get('/:id', authenticateToken, authorizeRoles('ogrenci', 'ogretmen'), async (req, res) => {
   try {
     const { id } = req.params;
     const { rows: kitaplar } = await pool.query('SELECT * FROM kitaplar WHERE id = $1', [id]);
@@ -116,334 +90,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     return res.json({
       success: true,
-      data: {
-        etkinlik: kitapData,
-        sorular
-      }
+      data: { etkinlik: kitapData, sorular }
     });
   } catch (error) {
     console.error('Kitap detay hatası:', error);
     return res.status(500).json({ success: false, message: 'Kitap bilgileri alınırken hata oluştu' });
-  }
-});
-
-/** PUT /:id - Kitap güncelle */
-router.put('/:id', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
-
-    const { rows } = await pool.query('SELECT id FROM kitaplar WHERE id = $1', [id]);
-    if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
-    }
-
-    const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
-    await pool.query(
-      `UPDATE kitaplar SET ad = $1, aciklama = $2, kategori = $3, sinif_seviyesi = $4, durum = $5, toplam_puan = $6, gorsel_yolu = $7, ses_ikonu_gorsel = $8, ilerleme_butonu_gorsel = $9, geri_butonu_gorsel = $10, tam_ekran_butonu_gorsel = $11, kucuk_ekran_butonu_gorsel = $12, dogru_tik_gorsel = $13 WHERE id = $14`,
-      [ad, aciklama || null, kategori || null, sinif_seviyesi || null, durum, toplam_puan || null, gorsel_yolu ?? null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel), id]
-    );
-    return res.json({ success: true, message: 'Kitap güncellendi' });
-  } catch (error) {
-    console.error('Kitap güncelleme hatası:', error);
-    return res.status(500).json({ success: false, message: 'Kitap güncellenirken hata oluştu' });
-  }
-});
-
-/** DELETE /:id - Kitap sil (CASCADE ile sorular da silinir) */
-router.delete('/:id', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { rows } = await pool.query('SELECT id FROM kitaplar WHERE id = $1', [id]);
-    if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
-    }
-    await pool.query('DELETE FROM kitaplar WHERE id = $1', [id]);
-    return res.json({ success: true, message: 'Kitap silindi' });
-  } catch (error) {
-    console.error('Kitap silme hatası:', error);
-    return res.status(500).json({ success: false, message: 'Kitap silinirken hata oluştu' });
-  }
-});
-
-/** POST /:id/sorular - Soru ekle */
-router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, video_url, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenekler, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, soru_gorseli, asamali, asamalar } = req.body;
-
-    if (!soru_turu || !gecerliTurler.includes(soru_turu)) {
-      return res.status(400).json({ success: false, message: 'Geçerli soru türü gereklidir' });
-    }
-    const isAsamali = asamali === true || asamali === 'true' || asamali === 1 || asamali === '1';
-    const asamaliDolu = isAsamali && asamalar && Array.isArray(asamalar) && asamalar.length > 0;
-    if (soru_turu !== 'video_dinleme' && soru_turu !== 'diyalog' && soru_turu !== 'dogru_ses_dogru_gorsel' && soru_turu !== 'gorsel_ver_yazi_iste' && !asamaliDolu && (!secenekler || secenekler.length === 0)) {
-      return res.status(400).json({ success: false, message: 'Seçenekler gereklidir' });
-    }
-    if (soru_turu === 'video_dinleme' && !isAsamali && (!video_url || !String(video_url).trim())) {
-      return res.status(400).json({ success: false, message: 'Video İzleme için video URL veya yolu gereklidir' });
-    }
-    if (soru_turu === 'diyalog' && !isAsamali && (!arka_plan_gorsel_yatay || !String(arka_plan_gorsel_yatay).trim())) {
-      return res.status(400).json({ success: false, message: 'Diyalog için görsel gereklidir' });
-    }
-    if (soru_turu === 'gorsel_ver_yazi_iste' && (!arka_plan_gorsel_yatay || !String(arka_plan_gorsel_yatay).trim())) {
-      return res.status(400).json({ success: false, message: 'Görsel ver Yazı iste için görsel gereklidir' });
-    }
-    if (isAsamali && (!asamalar || !Array.isArray(asamalar) || asamalar.length === 0)) {
-      return res.status(400).json({ success: false, message: 'Aşamalı soru için en az bir aşama ekleyin' });
-    }
-    if (soru_turu === 'dinle_sec' && !asamaliDolu && (!ses_dosyasi || !String(ses_dosyasi).trim())) {
-      return res.status(400).json({ success: false, message: 'Dinle ve Seç için soru sesi (zorunlu) gereklidir' });
-    }
-    if (soru_turu === 'dinle_sec' && !asamaliDolu && (!soru_gorseli || !String(soru_gorseli).trim())) {
-      return res.status(400).json({ success: false, message: 'Dinle ve Seç için ses çalma görseli (zorunlu) gereklidir' });
-    }
-    if (soru_turu === 'dinle_sec' && asamaliDolu && asamalar.some(a => {
-      const icerik = (a.icerik && typeof a.icerik === 'object') ? a.icerik : {};
-      return !icerik.soru_gorseli || !String(icerik.soru_gorseli).trim();
-    })) {
-      return res.status(400).json({ success: false, message: 'Dinle ve Seç aşamalarında ses çalma görseli (zorunlu) gereklidir' });
-    }
-
-    const { rows: kitaplar } = await pool.query('SELECT id FROM kitaplar WHERE id = $1', [id]);
-    if (kitaplar.length === 0) {
-      return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
-    }
-
-    let finalSira = soru_numarasi;
-    if (finalSira == null) {
-      const { rows: maxRow } = await pool.query(
-        'SELECT COALESCE(MAX(soru_numarasi), 0) AS max_sira FROM kitap_sorulari WHERE kitap_id = $1',
-        [id]
-      );
-      finalSira = (maxRow[0]?.max_sira || 0) + 1;
-    }
-
-    const soruAdiVal = (soru_adi != null && String(soru_adi).trim() !== '') ? String(soru_adi).trim() : null;
-    const soruMetniVal = (soru_metni && String(soru_metni).trim()) ? String(soru_metni).trim() : null;
-    const yonergeVal = (yonerge != null && String(yonerge).trim() !== '') ? String(yonerge).trim() : null;
-    const yonergeSesVal = (yonerge_ses_dosyasi != null && String(yonerge_ses_dosyasi).trim() !== '') ? String(yonerge_ses_dosyasi).trim() : null;
-    const arkaYatay = (arka_plan_gorsel_yatay && String(arka_plan_gorsel_yatay).trim()) ? String(arka_plan_gorsel_yatay).trim() : null;
-    const arkaDikey = (arka_plan_gorsel_dikey && String(arka_plan_gorsel_dikey).trim()) ? String(arka_plan_gorsel_dikey).trim() : null;
-    const secArka = (secenek_arka_plan_gorseli && String(secenek_arka_plan_gorseli).trim()) ? String(secenek_arka_plan_gorseli).trim() : null;
-    const videoUrlVal = (video_url != null && String(video_url).trim() !== '') ? String(video_url).trim() : null;
-    const soruGorseliVal = (soru_gorseli != null && String(soru_gorseli).trim() !== '') ? String(soru_gorseli).trim() : null;
-    const asamaliVal = !!isAsamali;
-    const { rows: soruRows } = await pool.query(
-      `INSERT INTO kitap_sorulari (kitap_id, soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, dogru_cevap_id, ek_bilgi, yonerge, yonerge_ses_dosyasi, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, video_url, soru_gorseli, asamali)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
-      [id, finalSira, soru_turu, soruAdiVal, soruMetniVal, soru_puan || null, ses_dosyasi || null, null, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaYatay, arkaDikey, secArka, videoUrlVal, soruGorseliVal, asamaliVal]
-    );
-    const soruId = soruRows[0].id;
-
-    const asamalarListesi = (isAsamali && asamalar && Array.isArray(asamalar)) ? asamalar : [];
-    for (let i = 0; i < asamalarListesi.length; i++) {
-      const a = asamalarListesi[i];
-      const asamaNum = (a.asama_numarasi != null) ? Number(a.asama_numarasi) : (i + 1);
-      const icerik = (a.icerik && typeof a.icerik === 'object') ? a.icerik : (typeof a === 'object' && !a.asama_numarasi ? a : {});
-      await pool.query(
-        'INSERT INTO kitap_soru_asamalari (soru_id, asama_numarasi, icerik) VALUES ($1, $2, $3)',
-        [soruId, asamaNum, typeof icerik === 'string' ? icerik : JSON.stringify(icerik)]
-      ).catch(() => {});
-    }
-
-    let dogruCevapId = null;
-    const secenekListesi = soru_turu === 'video_dinleme' ? (secenekler || []) : (secenekler || []);
-    for (const secenek of secenekListesi) {
-      const secMetni = (secenek.secenek_metni && secenek.secenek_metni.trim()) ? secenek.secenek_metni.trim() : null;
-      const secGorseli = (secenek.secenek_gorseli && secenek.secenek_gorseli.trim()) ? secenek.secenek_gorseli.trim() : null;
-      const secSes = (secenek.secenek_ses_dosyasi && secenek.secenek_ses_dosyasi.trim()) ? secenek.secenek_ses_dosyasi.trim() : null;
-      const secRengi = (secenek.secenek_rengi && secenek.secenek_rengi.trim()) ? secenek.secenek_rengi.trim() : null;
-      const dogruCevap = secenek.dogru_cevap === true || secenek.dogru_cevap === 1 ? 1 : 0;
-      const siralama = secenek.siralama ?? 0;
-
-      const { rows: secRows } = await pool.query(
-        `INSERT INTO kitap_soru_secenekleri (soru_id, secenek_metni, secenek_gorseli, secenek_ses_dosyasi, secenek_rengi, kategori, dogru_cevap, siralama)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-        [soruId, secMetni, secGorseli, secSes, secRengi, secenek.kategori || null, dogruCevap, siralama]
-      );
-      if (dogruCevap === 1 && dogruCevapId === null) dogruCevapId = secRows[0].id;
-    }
-
-    if (dogruCevapId) {
-      await pool.query('UPDATE kitap_sorulari SET dogru_cevap_id = $1 WHERE id = $2', [dogruCevapId, soruId]);
-    }
-
-    return res.status(201).json({ success: true, message: 'Soru eklendi', data: { id: soruId } });
-  } catch (error) {
-    console.error('Kitap soru ekleme hatası:', error);
-    return res.status(500).json({ success: false, message: 'Soru eklenirken hata oluştu' });
-  }
-});
-
-/** PUT /:id/sorular/siralama */
-router.put('/:id/sorular/siralama', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { soruSiralamalari } = req.body;
-    if (!soruSiralamalari || !Array.isArray(soruSiralamalari)) {
-      return res.status(400).json({ success: false, message: 'soruSiralamalari gereklidir' });
-    }
-
-    const { rows } = await pool.query('SELECT id FROM kitaplar WHERE id = $1', [id]);
-    if (rows.length === 0) return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
-
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const offset = 100000;
-      const hedefNumaralar = soruSiralamalari.map(s => Number(s.soru_numarasi));
-      const listedekiSoruIds = soruSiralamalari.map(s => Number(s.soru_id));
-
-      for (const { soru_id, soru_numarasi } of soruSiralamalari) {
-        const { rows: kontrol } = await client.query('SELECT id FROM kitap_sorulari WHERE id = $1 AND kitap_id = $2', [soru_id, id]);
-        if (kontrol.length === 0) {
-          await client.query('ROLLBACK');
-          return res.status(404).json({ success: false, message: `Soru ${soru_id} bulunamadı` });
-        }
-      }
-
-      if (hedefNumaralar.length > 0 && listedekiSoruIds.length > 0) {
-        await client.query(
-          `UPDATE kitap_sorulari SET soru_numarasi = (id + $1) WHERE kitap_id = $2 AND soru_numarasi = ANY($3) AND NOT (id = ANY($4))`,
-          [offset, id, hedefNumaralar, listedekiSoruIds]
-        );
-      }
-      for (const { soru_id } of soruSiralamalari) {
-        await client.query('UPDATE kitap_sorulari SET soru_numarasi = $1 WHERE id = $2 AND kitap_id = $3', [offset + Number(soru_id), soru_id, id]);
-      }
-      for (const { soru_id, soru_numarasi } of soruSiralamalari) {
-        await client.query('UPDATE kitap_sorulari SET soru_numarasi = $1 WHERE id = $2 AND kitap_id = $3', [soru_numarasi, soru_id, id]);
-      }
-      await client.query('COMMIT');
-      return res.json({ success: true, message: 'Sıralama güncellendi' });
-    } catch (txErr) {
-      await client.query('ROLLBACK').catch(() => {});
-      throw txErr;
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error('Sıralama hatası:', error);
-    return res.status(500).json({ success: false, message: 'Sıralama güncellenirken hata oluştu' });
-  }
-});
-
-/** PUT /:id/sorular/:soruId - Soru güncelle */
-router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
-  try {
-    const { id, soruId } = req.params;
-    const { soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, video_url, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenekler, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, soru_gorseli, asamali, asamalar } = req.body;
-
-    const { rows: kitaplar } = await pool.query('SELECT id FROM kitaplar WHERE id = $1', [id]);
-    if (kitaplar.length === 0) return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
-
-    const guncelTur = soru_turu || (await pool.query('SELECT soru_turu FROM kitap_sorulari WHERE id = $1 AND kitap_id = $2', [soruId, id])).rows[0]?.soru_turu;
-    const isAsamali = asamali === true || asamali === 'true' || asamali === 1 || asamali === '1';
-    const asamaliDolu = isAsamali && asamalar && Array.isArray(asamalar) && asamalar.length > 0;
-    if (guncelTur !== 'video_dinleme' && guncelTur !== 'diyalog' && guncelTur !== 'dogru_ses_dogru_gorsel' && guncelTur !== 'gorsel_ver_yazi_iste' && !asamaliDolu && (!secenekler || secenekler.length === 0)) {
-      return res.status(400).json({ success: false, message: 'Seçenekler gereklidir' });
-    }
-    if (guncelTur === 'video_dinleme' && !isAsamali && (video_url == null || String(video_url).trim() === '')) {
-      return res.status(400).json({ success: false, message: 'Video İzleme için video URL veya yolu gereklidir' });
-    }
-    if (guncelTur === 'diyalog' && !isAsamali && (!arka_plan_gorsel_yatay || !String(arka_plan_gorsel_yatay).trim())) {
-      return res.status(400).json({ success: false, message: 'Diyalog için görsel gereklidir' });
-    }
-    if (guncelTur === 'gorsel_ver_yazi_iste' && (!arka_plan_gorsel_yatay || !String(arka_plan_gorsel_yatay).trim())) {
-      return res.status(400).json({ success: false, message: 'Görsel ver Yazı iste için görsel gereklidir' });
-    }
-    if (isAsamali && (!asamalar || !Array.isArray(asamalar) || asamalar.length === 0)) {
-      return res.status(400).json({ success: false, message: 'Aşamalı soru için en az bir aşama ekleyin' });
-    }
-    const guncelAsamaliDolu = isAsamali && asamalar && Array.isArray(asamalar) && asamalar.length > 0;
-    if (guncelTur === 'dinle_sec' && !guncelAsamaliDolu && (!ses_dosyasi || !String(ses_dosyasi).trim())) {
-      return res.status(400).json({ success: false, message: 'Dinle ve Seç için soru sesi (zorunlu) gereklidir' });
-    }
-    if (guncelTur === 'dinle_sec' && !guncelAsamaliDolu && (!soru_gorseli || !String(soru_gorseli).trim())) {
-      return res.status(400).json({ success: false, message: 'Dinle ve Seç için ses çalma görseli (zorunlu) gereklidir' });
-    }
-    if (guncelTur === 'dinle_sec' && guncelAsamaliDolu && asamalar.some(a => {
-      const icerik = (a.icerik && typeof a.icerik === 'object') ? a.icerik : {};
-      return !icerik.soru_gorseli || !String(icerik.soru_gorseli).trim();
-    })) {
-      return res.status(400).json({ success: false, message: 'Dinle ve Seç aşamalarında ses çalma görseli (zorunlu) gereklidir' });
-    }
-
-    const soruAdiVal = (soru_adi != null && String(soru_adi).trim() !== '') ? String(soru_adi).trim() : null;
-    const soruMetniVal = (soru_metni != null && String(soru_metni).trim() !== '') ? String(soru_metni).trim() : null;
-    const yonergeVal = (yonerge != null && String(yonerge).trim() !== '') ? String(yonerge).trim() : null;
-    const yonergeSesVal = (yonerge_ses_dosyasi != null && String(yonerge_ses_dosyasi).trim() !== '') ? String(yonerge_ses_dosyasi).trim() : null;
-    const arkaYatay = (arka_plan_gorsel_yatay != null && String(arka_plan_gorsel_yatay).trim() !== '') ? String(arka_plan_gorsel_yatay).trim() : null;
-    const arkaDikey = (arka_plan_gorsel_dikey != null && String(arka_plan_gorsel_dikey).trim() !== '') ? String(arka_plan_gorsel_dikey).trim() : null;
-    const secArka = (secenek_arka_plan_gorseli != null && String(secenek_arka_plan_gorseli).trim() !== '') ? String(secenek_arka_plan_gorseli).trim() : null;
-    const videoUrlVal = (video_url != null && String(video_url).trim() !== '') ? String(video_url).trim() : null;
-    const soruGorseliVal = (soru_gorseli != null && String(soru_gorseli).trim() !== '') ? String(soru_gorseli).trim() : null;
-    const asamaliVal = !!isAsamali;
-    await pool.query(
-      `UPDATE kitap_sorulari SET soru_turu = $1, soru_puan = $2, ses_dosyasi = $3, soru_adi = $4, soru_metni = $5, dogru_cevap_id = NULL, ek_bilgi = $6, yonerge = $7, yonerge_ses_dosyasi = $8, arka_plan_gorsel_yatay = $9, arka_plan_gorsel_dikey = $10, secenek_arka_plan_gorseli = $11, video_url = $12, soru_gorseli = $13, asamali = $14${soru_numarasi != null ? ', soru_numarasi = $15' : ''} WHERE id = ${soru_numarasi != null ? '$16' : '$15'}`,
-      soru_numarasi != null
-        ? [guncelTur, soru_puan || null, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaYatay, arkaDikey, secArka, videoUrlVal, soruGorseliVal, asamaliVal, soru_numarasi, soruId]
-        : [guncelTur, soru_puan || null, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaYatay, arkaDikey, secArka, videoUrlVal, soruGorseliVal, asamaliVal, soruId]
-    );
-
-    await pool.query('DELETE FROM kitap_soru_asamalari WHERE soru_id = $1', [soruId]).catch(() => {});
-    const asamalarListesiGuncel = (asamaliVal && asamalar && Array.isArray(asamalar)) ? asamalar : [];
-    for (let i = 0; i < asamalarListesiGuncel.length; i++) {
-      const a = asamalarListesiGuncel[i];
-      const asamaNum = (a.asama_numarasi != null) ? Number(a.asama_numarasi) : (i + 1);
-      const icerik = (a.icerik && typeof a.icerik === 'object') ? a.icerik : (typeof a === 'object' && !a.asama_numarasi ? a : {});
-      await pool.query(
-        'INSERT INTO kitap_soru_asamalari (soru_id, asama_numarasi, icerik) VALUES ($1, $2, $3)',
-        [soruId, asamaNum, typeof icerik === 'string' ? icerik : JSON.stringify(icerik)]
-      ).catch(() => {});
-    }
-
-    await pool.query('DELETE FROM kitap_soru_secenekleri WHERE soru_id = $1', [soruId]);
-
-    let dogruCevapId = null;
-    const secenekListesiGuncelleme = guncelTur === 'video_dinleme' ? (secenekler || []) : (secenekler || []);
-    for (const secenek of secenekListesiGuncelleme) {
-      const secMetni = (secenek.secenek_metni && secenek.secenek_metni.trim()) ? secenek.secenek_metni.trim() : null;
-      const secGorseli = (secenek.secenek_gorseli && secenek.secenek_gorseli.trim()) ? secenek.secenek_gorseli.trim() : null;
-      const secSes = (secenek.secenek_ses_dosyasi && secenek.secenek_ses_dosyasi.trim()) ? secenek.secenek_ses_dosyasi.trim() : null;
-      const secRengi = (secenek.secenek_rengi && secenek.secenek_rengi.trim()) ? secenek.secenek_rengi.trim() : null;
-      const dogruCevap = secenek.dogru_cevap === true || secenek.dogru_cevap === 1 ? 1 : 0;
-      const siralama = secenek.siralama ?? 0;
-
-      const { rows: secRows } = await pool.query(
-        `INSERT INTO kitap_soru_secenekleri (soru_id, secenek_metni, secenek_gorseli, secenek_ses_dosyasi, secenek_rengi, kategori, dogru_cevap, siralama) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-        [soruId, secMetni, secGorseli, secSes, secRengi, secenek.kategori || null, dogruCevap, siralama]
-      );
-      if (dogruCevap === 1 && dogruCevapId === null) dogruCevapId = secRows[0].id;
-    }
-    if (dogruCevapId) {
-      await pool.query('UPDATE kitap_sorulari SET dogru_cevap_id = $1 WHERE id = $2', [dogruCevapId, soruId]);
-    }
-
-    return res.json({ success: true, message: 'Soru güncellendi', data: { id: soruId } });
-  } catch (error) {
-    console.error('Soru güncelleme hatası:', error);
-    return res.status(500).json({ success: false, message: 'Soru güncellenirken hata oluştu' });
-  }
-});
-
-/** DELETE /:id/sorular/:soruId */
-router.delete('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
-  try {
-    const { id, soruId } = req.params;
-    const { rows } = await pool.query('SELECT id FROM kitaplar WHERE id = $1', [id]);
-    if (rows.length === 0) return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
-
-    const { rows: soruRows } = await pool.query('SELECT id FROM kitap_sorulari WHERE id = $1 AND kitap_id = $2', [soruId, id]);
-    if (soruRows.length === 0) return res.status(404).json({ success: false, message: 'Soru bulunamadı' });
-
-    await pool.query('DELETE FROM kitap_soru_secenekleri WHERE soru_id = $1', [soruId]);
-    await pool.query('DELETE FROM kitap_sorulari WHERE id = $1', [soruId]);
-    return res.json({ success: true, message: 'Soru silindi' });
-  } catch (error) {
-    console.error('Soru silme hatası:', error);
-    return res.status(500).json({ success: false, message: 'Soru silinirken hata oluştu' });
   }
 });
 
