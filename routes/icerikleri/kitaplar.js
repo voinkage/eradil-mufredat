@@ -88,6 +88,24 @@ router.get('/:id', authenticateToken, authorizeRoles('ogrenci', 'ogretmen'), asy
     const kitapData = { ...kitaplar[0], soru_sayisi: sorular.length };
     if (sorular.length > 0 && !kitapData.tur) kitapData.tur = sorular[0].soru_turu;
 
+    const N = sorular.length;
+    if (N > 0) {
+      const toplamPuan = kitapData.toplam_puan;
+      const toplamYildiz = kitapData.toplam_yildiz;
+      if (toplamPuan != null && toplamPuan > 0 && toplamPuan % N === 0) {
+        const puanPerSoru = Math.floor(toplamPuan / N);
+        for (const soru of sorular) {
+          if (soru.soru_puan == null || soru.soru_puan === 0) soru.soru_puan = puanPerSoru;
+        }
+      }
+      if (toplamYildiz != null && toplamYildiz > 0 && toplamYildiz % N === 0) {
+        const yildizPerSoru = Math.floor(toplamYildiz / N);
+        for (const soru of sorular) {
+          if (soru.soru_yildiz == null || soru.soru_yildiz === 0) soru.soru_yildiz = yildizPerSoru;
+        }
+      }
+    }
+
     return res.json({
       success: true,
       data: { etkinlik: kitapData, sorular }
