@@ -36,7 +36,7 @@ router.get('/:id', authenticateToken, authorizeRoles('ogrenci', 'ogretmen'), asy
     }
 
     const { rows: sorularRaw } = await pool.query(
-      `SELECT * FROM kitap_sorulari WHERE kitap_id = $1 ORDER BY soru_numarasi`,
+      `SELECT * FROM kitap_sorulari WHERE kitap_id = $1 AND COALESCE(aktif, true) = true ORDER BY soru_numarasi`,
       [id]
     );
 
