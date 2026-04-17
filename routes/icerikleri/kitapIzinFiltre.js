@@ -4,7 +4,7 @@
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const { loadErisimCtx, listRulesForOkullar, canSeeIcerik } = require('../../izin-sistemi');
+const { loadErisimCtx, listRulesForOkullar, canSeeIcerik } = require('../../izin-sistemi/index.cjs');
 
 /**
  * IZINLER_DB yoksa tüm satırlar; varsa okul/sınıf/öğretmen kurallarına göre süzülür.
