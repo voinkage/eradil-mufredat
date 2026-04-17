@@ -1,6 +1,6 @@
 /**
  * POSTGRESQL DATABASE CONFIGURATION
- * Müfredat içerikleri (kitaplar) – tüm içerikler herkese açık, izin/atama yok
+ * Müfredat içerikleri (kitaplar) — liste/detay: IZINLER_DB + KULLANICI/ORGANIZASYON ile süzülür
  */
 
 import pg from 'pg';
@@ -53,6 +53,26 @@ if (process.env.DIGIBUCH_DB_URL) {
 
 export const digibuchPool = digibuchConfig ? new Pool(digibuchConfig) : null;
 
+function createPoolFromUrl (connectionString, dbName) {
+  if (!connectionString) {
+    console.warn(`⚠️ ${dbName} için connection string yok (içerik izinleri isteğe bağlı)`);
+    return null;
+  }
+  return new Pool({
+    connectionString,
+    max: parseInt(process.env.DB_CONNECTION_LIMIT) || 10,
+    idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || 30000,
+    connectionTimeoutMillis: parseInt(process.env.DB_CONNECT_TIMEOUT) || 60000,
+    ssl: { rejectUnauthorized: false }
+  });
+}
+
+/** Öğrenci/öğretmen okul & sınıf bağlamı (izin filtreleme) */
+export const kullaniciPool = createPoolFromUrl(process.env.KULLANICI_DB_URL, 'KULLANICI_DB');
+export const organizasyonPool = createPoolFromUrl(process.env.ORGANIZASYON_DB_URL, 'ORGANIZASYON_DB');
+/** Kitap/etkinlik × okul kuralları */
+export const izinlerPool = createPoolFromUrl(process.env.IZINLER_DB_URL, 'IZINLER_DB');
+
 // Connection test
 if (digibuchPool) {
   digibuchPool.query('SELECT NOW()', (err, res) => {
@@ -66,11 +86,20 @@ if (digibuchPool) {
   console.warn('⚠️ Müfredat DB (DIGIBUCH_DB_URL) yapılandırması eksik!');
 }
 
+for (const [name, p] of [['KULLANICI_DB', kullaniciPool], ['ORGANIZASYON_DB', organizasyonPool], ['IZINLER_DB', izinlerPool]]) {
+  if (p) {
+    p.query('SELECT NOW()').then(() => console.log(`✅ Müfredat — ${name} bağlandı`)).catch((e) => console.error(`❌ ${name}:`, e.message));
+  }
+}
+
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('🔄 Database bağlantıları kapatılıyor...');
   if (digibuchPool) await digibuchPool.end();
+  if (kullaniciPool) await kullaniciPool.end();
+  if (organizasyonPool) await organizasyonPool.end();
+  if (izinlerPool) await izinlerPool.end();
   process.exit(0);
 });
 
-export default { digibuchPool };
+export default { digibuchPool, kullaniciPool, organizasyonPool, izinlerPool };

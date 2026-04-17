@@ -3,12 +3,18 @@
  * Admin listesi ve CRUD erax-admin'de (/api/mufredat/icerikleri/kitaplar).
  */
 import express from 'express';
-import { digibuchPool as pool } from '../../config/database.pg.js';
+import {
+  digibuchPool as pool,
+  kullaniciPool,
+  organizasyonPool,
+  izinlerPool
+} from '../../config/database.pg.js';
 import { authenticateToken, authorizeRoles } from '../../middleware/auth.js';
+import { filtreKitaplarForUser, kitapErisimIzniVar } from './kitapIzinFiltre.js';
 
 const router = express.Router();
 
-/** GET / - Öğrenci/öğretmen: kitap listesi. Öğrenci için sadece aktif. */
+/** GET / - Öğrenci/öğretmen: kitap listesi. Öğrenci için sadece aktif. İZINLER_DB: okul/sınıf/öğretmen kuralları. */
 router.get('/', authenticateToken, authorizeRoles('ogrenci', 'ogretmen'), async (req, res) => {
   try {
     const userRol = req.user.rol || req.user.role;
@@ -19,7 +25,12 @@ router.get('/', authenticateToken, authorizeRoles('ogrenci', 'ogretmen'), async 
       FROM kitaplar k${whereClause}
       ORDER BY k.id DESC
     `);
-    return res.json({ success: true, data: rows });
+    const filtered = await filtreKitaplarForUser(rows, req.user, {
+      kullaniciPool,
+      organizasyonPool,
+      izinlerPool
+    });
+    return res.json({ success: true, data: filtered });
   } catch (error) {
     console.error('Kitaplar listele hatası:', error);
     return res.status(500).json({ success: false, message: 'Kitaplar listelenirken hata oluştu' });
@@ -33,6 +44,15 @@ router.get('/:id', authenticateToken, authorizeRoles('ogrenci', 'ogretmen'), asy
     const { rows: kitaplar } = await pool.query('SELECT * FROM kitaplar WHERE id = $1', [id]);
     if (kitaplar.length === 0) {
       return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
+    }
+
+    const izinli = await kitapErisimIzniVar(id, req.user, {
+      kullaniciPool,
+      organizasyonPool,
+      izinlerPool
+    });
+    if (!izinli) {
+      return res.status(403).json({ success: false, message: 'Bu ünite için erişim izniniz yok' });
     }
 
     const { rows: sorularRaw } = await pool.query(
